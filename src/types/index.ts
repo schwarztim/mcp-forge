@@ -200,3 +200,66 @@ export interface PipelineState {
   errors: string[];
   log: string[];
 }
+
+// ══════════════════════════════════════════════════════════════════
+// thesun Intelligence Layer Types (merged into Forge v3)
+// ══════════════════════════════════════════════════════════════════
+
+import { z } from 'zod';
+
+// Re-export everything from thesun types for backward compatibility
+export {
+  ToolSpecSchema, type ToolSpec,
+  BuildPhase, BuildStateSchema, type BuildState,
+  BobInstanceSchema, type BobInstance,
+  DiscoveredEndpointSchema, type DiscoveredEndpoint,
+  DiscoveryResultSchema, type DiscoveryResult,
+  SecurityFindingSchema, type SecurityFinding,
+  SecurityReportSchema, type SecurityReport,
+  WorkflowTriggerSchema, type WorkflowTrigger,
+  WorkflowStepSchema, type WorkflowStep,
+  WorkflowDefinitionSchema, type WorkflowDefinition,
+  OrchestratorConfigSchema, type OrchestratorConfig,
+  RequirementTypeSchema, type RequirementType,
+  RequirementStatusSchema, type RequirementStatus,
+  RequirementSchema, type Requirement,
+  RequirementSetSchema, type RequirementSet,
+  DiscoverySourceSchema, type DiscoverySource,
+  DiscoveryLogSchema, type DiscoveryLog,
+  ValidationRuleSchema, type ValidationRule,
+  ValidationResultSchema, type ValidationResult,
+  RequirementValidationReportSchema, type RequirementValidationReport,
+  DependencyStatusSchema, type DependencyStatus,
+  PreflightCheckResultSchema, type PreflightCheckResult,
+  McpQualityScoreSchema, type McpQualityScore,
+  ExistingMcpSchema, type ExistingMcp,
+  McpSearchResultSchema, type McpSearchResult,
+  AuthTypeSchema, type AuthType,
+  StoredCredentialSchema, type StoredCredential,
+  CredentialMetaSchema, type CredentialMeta,
+  EndpointHealthStatusSchema, type EndpointHealthStatus,
+  CheckedEndpointSchema, type CheckedEndpoint,
+  HealthCheckResultSchema, type HealthCheckResult,
+  RecoveryActionTypeSchema, type RecoveryActionType,
+  RecoveryActionSchema, type RecoveryAction,
+  HealthMetricsSchema, type HealthMetrics,
+  AuthHealthStatusSchema, type AuthHealthStatus,
+  VersionCheckResultSchema, type VersionCheckResult,
+  ValidationGatePhaseSchema, type ValidationGatePhase,
+  ValidationDetailSchema, type ValidationDetail,
+  ValidationPhaseResultSchema, type ValidationPhaseResult,
+  ValidationGateResultSchema, type ValidationGateResult,
+  CachedSpecSchema, type CachedSpec,
+  CacheDiffSchema, type CacheDiff,
+  CacheStatsSchema, type CacheStats,
+  ModifiedFileSchema, type ModifiedFile,
+  HarEntrySchema, type HarEntry,
+  HarFileSchema, type HarFile,
+  SsoIdpTypeSchema, type SsoIdpType,
+  GlobalSsoCredentialSchema, type GlobalSsoCredential,
+  GlobalSsoStoreSchema, type GlobalSsoStore,
+  SsoDetectionResultSchema, type SsoDetectionResult,
+  SsoPatternSchema, type SsoPattern,
+  ConfigValidationRuleSchema, type ConfigValidationRule,
+  ConfigValidationResultSchema,
+} from './thesun-types.js';
