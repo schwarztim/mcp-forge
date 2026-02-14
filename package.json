@@ -1,0 +1,63 @@
+{
+  "name": "mcp-forge",
+  "version": "2.0.0",
+  "description": "Autonomous MCP server generator — turns any REST API into a production-ready Model Context Protocol server in seconds",
+  "type": "module",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "mcp-forge": "./dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "mcp": "node dist/mcp-server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "forge": "node dist/cli/index.js forge"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.7.9",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "glob": "^11.0.0",
+    "handlebars": "^4.7.8",
+    "js-yaml": "^4.1.0",
+    "ora": "^8.1.1",
+    "playwright": "^1.49.0",
+    "swagger-parser": "^10.0.3",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "author": "Timothy Schwarz",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/schwarztim/mcp-forge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/schwarztim/mcp-forge/issues"
+  },
+  "homepage": "https://github.com/schwarztim/mcp-forge#readme",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "copilot",
+    "api",
+    "openapi",
+    "code-generator",
+    "automation",
+    "typescript"
+  ]
+}

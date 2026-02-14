@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.log
+.cookie-cache.json
+.mcp-forge/
+*.har
+.DS_Store
+coverage/
+.vscode/
+.idea/
