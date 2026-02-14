@@ -360,10 +360,60 @@ Example: forge_patterns({ specPath: "/path/to/openapi.yaml" })`,
       required: [],
     },
   },
+  {
+    name: "forge_crawl_docs",
+    description: `Crawl an API documentation site to discover endpoints, auth patterns, entities, and code examples.
+Learned from Brinqa build: manual doc research takes hours. This automates it.
+Spiders linked pages, extracts REST endpoints, detects auth methods, finds entity names.
+Also probes for OpenAPI/Swagger specs at common locations.
+
+Examples:
+- forge_crawl_docs({ docsUrl: "https://docs.brinqa.com" })
+- forge_crawl_docs({ docsUrl: "https://developer.servicenow.com/dev.do", apiName: "servicenow", maxPages: 30 })`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        docsUrl: {
+          type: "string",
+          description: "Documentation site URL to crawl",
+        },
+        apiName: {
+          type: "string",
+          description: "API/platform name (helps detect query language)",
+        },
+        maxPages: {
+          type: "number",
+          description: "Maximum pages to crawl (default: 50)",
+        },
+      },
+      required: ["docsUrl"],
+    },
+  },
+  {
+    name: "forge_query_languages",
+    description: `List known platform-specific query languages (BQL, JQL, NRQL, KQL, SPL, etc.) with syntax hints and examples.
+Learned from Brinqa/ServiceNow/Jira builds: enriching filter parameters with query language docs dramatically improves tool usability.
+Can also detect which query language a platform uses.
+
+Examples:
+- forge_query_languages({}) — list all known query languages
+- forge_query_languages({ platform: "brinqa" }) — get BQL syntax and examples
+- forge_query_languages({ platform: "jira" }) — get JQL syntax and examples`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        platform: {
+          type: "string",
+          description: "Platform name to detect query language for (optional)",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 const server = new Server(
-  { name: "mcp-forge", version: "3.0.0" },
+  { name: "mcp-forge", version: "3.1.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -504,7 +554,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             type: "text",
             text: JSON.stringify({
               name: "MCP Forge",
-              version: "3.0.0",
+              version: "3.1.0",
               architecture: "Forge code generator + thesun intelligence layer",
               capabilities: [
                 "OpenAPI spec → MCP server",
@@ -523,16 +573,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 "Adaptive rate limiting (token bucket + 429 detection + backoff)",
                 "Auto-registration in ~/.claude/user-mcps.json",
                 "Auto-build with TypeScript",
-                "🆕 Orchestrated build pipeline (state machine with auto-fix loops)",
-                "🆕 Validation gate (build → endpoints → auth → integration)",
-                "🆕 Security hardening (CVE detection, input sanitization, scope minimization)",
-                "🆕 Self-healing health monitoring (auto-recovery)",
-                "🆕 Pattern intelligence (pagination, error, rate-limit, auth detection)",
-                "🆕 Smart caching (spec diffing, build memoization)",
-                "🆕 Requirement tracking & validation",
-                "🆕 Governance supervisor (resource limits, job watching)",
+                "Orchestrated build pipeline (state machine with auto-fix loops)",
+                "Validation gate (build → endpoints → auth → integration)",
+                "Security hardening (CVE detection, input sanitization, scope minimization)",
+                "Self-healing health monitoring (auto-recovery)",
+                "Pattern intelligence (pagination, error, rate-limit, auth detection)",
+                "Smart caching (spec diffing, build memoization)",
+                "Requirement tracking & validation",
+                "Governance supervisor (resource limits, job watching)",
+                "🆕 GraphQL introspection → entity-centric MCP generation",
+                "🆕 Documentation site crawler (endpoint/entity/auth extraction)",
+                "🆕 Query language registry (BQL, JQL, NRQL, KQL, SPL, SQ, FQL)",
+                "🆕 Dual-API architecture support (GraphQL + REST in one MCP)",
               ],
-              learnings: "v3.0 merges Forge (code gen) + thesun (intelligence) into a single platform",
+              learnings: "v3.1 adds GraphQL, doc crawling, and query language support from Brinqa/MS365 builds",
               rateLimiting: {
                 generatedMcps: "Every generated MCP gets an adaptive rate limiter baked into its API client.",
                 forgePipeline: "MCP Forge itself rate-limits builds and discovery operations.",
@@ -773,6 +827,57 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      case "forge_crawl_docs": {
+        const docsUrl = (args as any).docsUrl as string;
+        if (!docsUrl) throw new Error("docsUrl is required");
+
+        const { crawlDocumentation, findOpenApiSpec } = await import('../discovery/doc-crawler.js');
+        const crawlResult = await crawlDocumentation(docsUrl, {
+          maxPages: (args as any).maxPages,
+          apiName: (args as any).apiName,
+        });
+
+        // Also check for OpenAPI spec
+        let specUrl: string | null = null;
+        try {
+          const baseUrl = new URL(docsUrl).origin;
+          specUrl = await findOpenApiSpec(baseUrl);
+        } catch { /* ignore */ }
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              ...crawlResult,
+              openApiSpec: specUrl,
+              message: `Crawled ${crawlResult.pagesVisited} pages. Found ${crawlResult.endpoints.length} endpoints, ${crawlResult.entities.length} entities.${specUrl ? ` OpenAPI spec found at: ${specUrl}` : ''}`,
+            }, null, 2),
+          }],
+        };
+      }
+
+      case "forge_query_languages": {
+        const { QUERY_LANGUAGES, detectQueryLanguage } = await import('../patterns/query-languages.js');
+        const platform = (args as any).platform as string | undefined;
+
+        if (platform) {
+          const ql = detectQueryLanguage(platform);
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify(ql || { error: `No query language detected for "${platform}"` }, null, 2),
+            }],
+          };
+        }
+
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(QUERY_LANGUAGES, null, 2),
+          }],
+        };
+      }
+
       default:
         return {
           content: [{ type: "text", text: `Unknown tool: ${name}` }],
@@ -790,7 +895,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error(`[mcp-forge] MCP server running v3.0 (${TOOLS.length} tools: forge, forge_discover, forge_discover_browser, forge_merge_captures, forge_import_postman, forge_list, forge_status, forge_build, forge_validate, forge_health, forge_security, forge_patterns)`);
+  console.error(`[mcp-forge] MCP server running v3.1 (${TOOLS.length} tools: forge, forge_discover, forge_discover_browser, forge_merge_captures, forge_import_postman, forge_list, forge_status, forge_build, forge_validate, forge_health, forge_security, forge_patterns, forge_crawl_docs, forge_query_languages)`);
 }
 
 main().catch(console.error);

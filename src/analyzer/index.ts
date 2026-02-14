@@ -14,8 +14,11 @@ import yaml from 'js-yaml';
 import type {
   ApiSpec, ApiEndpoint, ApiParameter, ApiRequestBody,
   AuthStrategy, AuthConfig, EnvVar, ForgeConfig, InputFormat,
+  GraphQLSpec,
 } from '../types/index.js';
 import { KNOWN_APIS } from './known-apis.js';
+import { detectGraphQLEndpoint, introspectGraphQL, detectEntities } from '../generator/graphql.js';
+import { detectQueryLanguage } from '../patterns/query-languages.js';
 
 // ─── Input Detection ─────────────────────────────────────────
 
@@ -386,23 +389,81 @@ function extractHarParams(call: any): ApiParameter[] {
 // ─── URL Probe Analyzer ──────────────────────────────────────
 
 async function analyzeFromUrl(url: string, config: ForgeConfig): Promise<ApiSpec> {
-  // Check common spec locations
-  const specPaths = [
-    '/openapi.json', '/swagger.json', '/api-docs', '/v3/api-docs',
-    '/openapi.yaml', '/swagger.yaml', '/api/openapi.json',
-    '/.well-known/openapi.json',
-  ];
-
-  // For now, create a minimal spec from the URL — real implementation
-  // would probe these paths with HTTP requests
   const hostname = new URL(url).hostname;
   const slug = hostname.split('.')[0];
+  const baseUrl = url.replace(/\/$/, '');
 
+  // Probe for GraphQL endpoint first (learned from Brinqa build)
+  try {
+    const gqlEndpoint = await detectGraphQLEndpoint(baseUrl);
+    if (gqlEndpoint) {
+      console.error(`[analyzer] GraphQL endpoint detected: ${gqlEndpoint}`);
+
+      // Try introspection (may fail if auth is needed)
+      try {
+        const authHeaders: Record<string, string> = {};
+        const token = process.env[`${slug.toUpperCase()}_API_TOKEN`];
+        if (token) authHeaders['Authorization'] = `Bearer ${token}`;
+
+        const schema = await introspectGraphQL(gqlEndpoint, authHeaders);
+        const entities = detectEntities(schema);
+        const ql = detectQueryLanguage(config.target);
+
+        return {
+          title: `${slug} API`,
+          description: `GraphQL API at ${gqlEndpoint}. ${entities.length} entities discovered via introspection.`,
+          version: '1.0.0',
+          baseUrl,
+          authStrategy: config.authStrategy || 'bearer',
+          authConfig: { strategy: config.authStrategy || 'bearer', envVarName: `${slug.toUpperCase()}_API_TOKEN` },
+          apiStyle: 'graphql',
+          endpoints: [],
+          tags: entities.map(e => e.pluralName),
+          envVars: buildEnvVars(baseUrl, config.authStrategy || 'bearer', { strategy: 'bearer' }, slug),
+          graphqlSchema: schema,
+          entities: entities.map(e => ({
+            name: e.name,
+            pluralName: e.pluralName,
+            source: 'graphql' as const,
+            fields: e.fields.map(f => ({
+              name: f.name, type: f.type, isRequired: f.isNonNull,
+              description: f.description, isId: f.name === 'id',
+              isSearchable: ['name', 'displayName', 'title', 'hostname', 'email'].includes(f.name),
+            })),
+            defaultFields: e.defaultFields,
+            operations: [
+              { type: 'list' as const, queryField: e.queryFieldName, description: `List ${e.pluralName}` },
+              { type: 'search' as const, queryField: e.queryFieldName, description: `Search ${e.pluralName}` },
+            ],
+            queryLanguage: ql?.name,
+          })),
+          queryLanguage: ql,
+        };
+      } catch (introErr: any) {
+        console.error(`[analyzer] GraphQL introspection failed (auth needed?): ${introErr.message}`);
+        // Still flag as GraphQL even without introspection
+        return {
+          title: `${slug} API`,
+          description: `GraphQL API detected at ${gqlEndpoint}. Introspection failed — provide auth token.`,
+          version: '1.0.0',
+          baseUrl,
+          authStrategy: config.authStrategy || 'bearer',
+          authConfig: { strategy: config.authStrategy || 'bearer', envVarName: `${slug.toUpperCase()}_API_TOKEN` },
+          apiStyle: 'graphql',
+          endpoints: [],
+          tags: [],
+          envVars: buildEnvVars(baseUrl, config.authStrategy || 'bearer', { strategy: 'bearer' }, slug),
+        };
+      }
+    }
+  } catch { /* GraphQL probe failed — continue with REST */ }
+
+  // Fall back to REST spec probe
   return {
     title: `${slug} API`,
     description: `API at ${url}. Provide an OpenAPI spec or HAR capture for detailed endpoint discovery.`,
     version: '1.0.0',
-    baseUrl: url.replace(/\/$/, ''),
+    baseUrl,
     authStrategy: config.authStrategy || 'bearer',
     authConfig: { strategy: config.authStrategy || 'bearer', envVarName: `${slug.toUpperCase()}_TOKEN` },
     apiStyle: 'rest',

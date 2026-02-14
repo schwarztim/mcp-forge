@@ -117,6 +117,12 @@ export interface ApiSpec {
   endpoints: ApiEndpoint[];
   tags: string[];
   envVars: EnvVar[];
+  // v3.1: GraphQL + entity-centric + dual-API
+  graphqlSchema?: GraphQLSchema;
+  entities?: EntityDefinition[];
+  compositeTools?: CompositeToolDef[];
+  queryLanguage?: QueryLanguageDef;
+  dualApi?: DualApiSpec;
 }
 
 export interface AuthConfig {
@@ -199,6 +205,182 @@ export interface PipelineState {
   startTime: number;
   errors: string[];
   log: string[];
+}
+
+// ─── GraphQL Support (learned from Brinqa build) ─────────────
+
+export interface GraphQLType {
+  name: string;
+  kind: 'OBJECT' | 'INPUT_OBJECT' | 'ENUM' | 'SCALAR' | 'LIST' | 'NON_NULL' | 'INTERFACE' | 'UNION';
+  fields: GraphQLField[];
+  description?: string;
+  isEntity: boolean;           // true if this type represents a queryable entity
+  defaultFields?: string[];    // subset of fields for default queries
+}
+
+export interface GraphQLField {
+  name: string;
+  type: string;
+  kind: string;
+  isList: boolean;
+  isNonNull: boolean;
+  description?: string;
+  args?: GraphQLArgument[];
+}
+
+export interface GraphQLArgument {
+  name: string;
+  type: string;
+  isRequired: boolean;
+  defaultValue?: string;
+  description?: string;
+}
+
+export interface GraphQLSchema {
+  queryType: string;
+  mutationType?: string;
+  types: GraphQLType[];
+  queries: GraphQLField[];     // root query fields
+  mutations: GraphQLField[];   // root mutation fields
+  endpoint: string;            // e.g. /graphql
+}
+
+export interface GraphQLSpec {
+  schema: GraphQLSchema;
+  baseUrl: string;
+  authStrategy: AuthStrategy;
+  authConfig?: AuthConfig;
+  entities: GraphQLEntitySpec[];
+}
+
+export interface GraphQLEntitySpec {
+  name: string;
+  pluralName: string;
+  queryFieldName: string;      // root query field name (e.g. "assets", "findings")
+  fields: GraphQLField[];
+  defaultFields: string[];     // fields to include in default queries
+  filterType?: string;         // e.g. "String" for BQL filter
+  supportsLimit: boolean;
+  supportsOffset: boolean;
+  supportsCursor: boolean;
+  mutations: GraphQLMutationSpec[];
+}
+
+export interface GraphQLMutationSpec {
+  name: string;
+  operationName: string;
+  inputType?: string;
+  description: string;
+}
+
+// ─── Entity-Centric Generation (learned from Brinqa build) ───
+
+export interface EntityDefinition {
+  name: string;
+  pluralName: string;
+  source: 'openapi' | 'graphql' | 'har' | 'docs';
+  fields: EntityField[];
+  defaultFields: string[];
+  operations: EntityOperation[];
+  queryLanguage?: string;      // e.g. 'BQL', 'JQL'
+}
+
+export interface EntityField {
+  name: string;
+  type: string;
+  isRequired: boolean;
+  description?: string;
+  isId: boolean;
+  isSearchable: boolean;
+}
+
+export type EntityOperationType = 'list' | 'get' | 'search' | 'create' | 'update' | 'delete';
+
+export interface EntityOperation {
+  type: EntityOperationType;
+  endpoint?: ApiEndpoint;      // for REST
+  queryField?: string;         // for GraphQL
+  customFilter?: string;       // pre-built filter (e.g. overdue tickets)
+  description: string;
+}
+
+// ─── Composite/Summary Tools ─────────────────────────────────
+
+export interface CompositeToolDef {
+  name: string;
+  description: string;
+  queries: CompositeQuery[];   // parallel queries to aggregate
+  outputTemplate: string;      // how to combine results
+}
+
+export interface CompositeQuery {
+  toolName: string;            // reference to another tool
+  label: string;               // label in output
+  defaultArgs?: Record<string, unknown>;
+}
+
+// ─── Query Language Registry ─────────────────────────────────
+
+export interface QueryLanguageDef {
+  name: string;                // e.g. 'BQL', 'JQL'
+  fullName: string;            // e.g. 'Brinqa Query Language'
+  platform: string;            // e.g. 'Brinqa', 'Jira'
+  syntaxHint: string;          // short syntax description
+  examples: string[];          // example queries
+  paramName: string;           // typical parameter name (e.g. 'filter', 'jql')
+  docUrl?: string;
+}
+
+// ─── Documentation Crawler ───────────────────────────────────
+
+export interface CrawledPage {
+  url: string;
+  title: string;
+  endpoints: CrawledEndpoint[];
+  authPatterns: string[];
+  entityNames: string[];
+  codeExamples: CrawledCodeExample[];
+}
+
+export interface CrawledEndpoint {
+  method: string;
+  path: string;
+  description: string;
+  parameters: string[];
+  source: string;              // page URL where found
+}
+
+export interface CrawledCodeExample {
+  language: string;
+  code: string;
+  endpoint?: string;
+  source: string;
+}
+
+export interface DocCrawlResult {
+  pagesVisited: number;
+  endpoints: CrawledEndpoint[];
+  entities: string[];
+  authType: string;
+  queryLanguage?: string;
+  baseUrl?: string;
+}
+
+// ─── Dual-API Architecture ───────────────────────────────────
+
+export type ApiInterface = 'rest' | 'graphql' | 'websocket' | 'grpc';
+
+export interface DualApiSpec {
+  interfaces: ApiInterfaceSpec[];
+  sharedAuth: boolean;         // true if all interfaces share auth
+  primaryInterface: ApiInterface;
+}
+
+export interface ApiInterfaceSpec {
+  type: ApiInterface;
+  spec?: ApiSpec;              // for REST
+  graphqlSpec?: GraphQLSpec;   // for GraphQL
+  clientModule: string;        // generated file name
 }
 
 // ══════════════════════════════════════════════════════════════════

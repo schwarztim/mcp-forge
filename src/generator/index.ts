@@ -413,6 +413,7 @@ function generatePackageJson(mcpName: string, spec: ApiSpec): string {
     },
     dependencies: {
       '@modelcontextprotocol/sdk': '^1.0.4',
+      'zod': '^3.23.0',
     },
     devDependencies: {
       '@types/node': '^22.10.2',

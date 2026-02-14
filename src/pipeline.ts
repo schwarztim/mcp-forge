@@ -13,6 +13,7 @@ import { execSync } from 'child_process';
 import type { ForgeConfig, PipelineState, ApiSpec, GenerationResult } from './types/index.js';
 import { analyzeApi, detectInputFormat } from './analyzer/index.js';
 import { generateMcpServer } from './generator/index.js';
+import { generateGraphQLMcp } from './generator/graphql.js';
 import { registerMcp } from './registry/index.js';
 import { startDiscovery, convertPostmanToSpec, type DiscoveryConfig } from './discovery/optic.js';
 import { AdaptiveRateLimiter } from './utils/rate-limiter.js';
@@ -84,9 +85,51 @@ export class ForgePipeline {
       // Phase 3: Generate
       this.state.phase = 'generating';
       this.log('Generating MCP server code...');
-      const result = generateMcpServer(spec, this.state.config.outputDir);
+
+      let result: GenerationResult;
+
+      // GraphQL path: use GraphQL generator when schema is available
+      if (spec.apiStyle === 'graphql' && spec.graphqlSchema) {
+        this.log('Using GraphQL generator (entity-centric)...');
+        const mcpName = spec.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '') + '-mcp';
+        const prefix = spec.title.toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        const { detectEntities } = await import('./generator/graphql.js');
+        const detectedEntities = detectEntities(spec.graphqlSchema);
+
+        const graphqlSpec = {
+          baseUrl: spec.baseUrl,
+          schema: spec.graphqlSchema,
+          entities: detectedEntities,
+          authStrategy: spec.authStrategy,
+        } satisfies import('./types/index.js').GraphQLSpec;
+
+        const graphqlFiles = generateGraphQLMcp(graphqlSpec, mcpName, prefix);
+
+        // Also generate supporting files (package.json, tsconfig, etc.) from REST generator
+        const restResult = generateMcpServer(spec, this.state.config.outputDir);
+
+        // Replace src files with GraphQL-generated ones
+        result = {
+          ...restResult,
+          files: [
+            ...graphqlFiles,
+            ...restResult.files.filter(f =>
+              !f.path.startsWith('src/index.ts') &&
+              !f.path.startsWith('src/api-client.ts') &&
+              !f.path.includes('types.ts')
+            ),
+          ],
+          toolCount: graphqlSpec.entities.length * 2 + 3, // list + search per entity + auth + raw + introspect
+        };
+
+        this.log(`Generated GraphQL MCP: ${result.toolCount} tools, ${graphqlSpec.entities.length} entities`);
+      } else {
+        // REST path: standard generation
+        result = generateMcpServer(spec, this.state.config.outputDir);
+        this.log(`Generated ${result.files.length} files in ${result.outputDir}`);
+      }
+
       this.state.result = result;
-      this.log(`Generated ${result.files.length} files in ${result.outputDir}`);
 
       if (this.state.config.dryRun) {
         this.state.phase = 'complete';

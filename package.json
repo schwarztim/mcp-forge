@@ -1,7 +1,7 @@
 {
   "name": "mcp-forge",
-  "version": "3.0.0",
-  "description": "Autonomous MCP server generator with validation, security hardening, self-healing, and pattern intelligence",
+  "version": "3.1.0",
+  "description": "Autonomous MCP server generator with GraphQL introspection, doc crawling, query language registry, validation, security hardening, self-healing, and pattern intelligence",
   "type": "module",
   "main": "dist/cli/index.js",
   "bin": {
