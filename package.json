@@ -38,7 +38,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.10.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8",
+    "vitest": "^4.1.4",
     "@eslint/js": "^9.39.2",
     "@types/better-sqlite3": "^7.6.11",
     "@types/uuid": "^10.0.0",
